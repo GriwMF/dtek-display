@@ -1,104 +1,115 @@
-# DTEK Electricity Schedule Scraper
+# DTEK Schedule Server
 
-Python script to fetch electricity shutdown schedules from the DTEK website, bypassing Incapsula protection.
+Python API server that scrapes electricity shutdown schedules from the DTEK website, bypassing Incapsula protection.
+
+## Technical Overview
+
+The server uses Selenium with undetected-chromedriver to:
+1. Load the DTEK shutdowns page
+2. Wait for Incapsula protection to complete
+3. Extract schedule data from JavaScript variables
+4. Serve the data via REST API
 
 ## Requirements
 
 - Python 3.7+
 - Chrome/Chromium browser
-- ChromeDriver
+- ChromeDriver (auto-downloaded by undetected-chromedriver)
 
-## Installation
+## Quick Start
 
-1. Create a virtual environment (required on Arch Linux and other externally-managed Python environments):
+For deployment instructions, see the main [README.md](../README.md).
+
+### Development Mode
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+./run_server.sh  # Flask development server
 ```
 
-2. Install Python dependencies:
+### Production Mode
 ```bash
-pip install -r requirements.txt
+./run_prod.sh    # Gunicorn production server
 ```
 
-3. Install Chrome/Chromium browser:
-   - Arch Linux: `sudo pacman -S chromium`
-   - Ubuntu/Debian: `sudo apt-get install chromium-browser` or `chromium`
-   - The script uses `undetected-chromedriver` which automatically downloads ChromeDriver if needed
-
-## Usage
-
-### Command Line Script
-
-Make sure the virtual environment is activated, then run:
+### Command Line Tool
 ```bash
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-python main.py
+./run.sh         # Fetch and display schedule in terminal
 ```
 
-Or run directly with the venv Python:
-```bash
-venv/bin/python main.py  # On Windows: venv\Scripts\python main.py
+## API Documentation
+
+### Endpoints
+
+#### Health Check
+`GET /health`
+- Returns server status
+- No authentication required
+
+#### Full Schedule
+`GET /schedule?password=...&queue=GPV3.1&days=2`
+- Returns complete schedule data with metadata
+- Includes queue info, timestamps, and detailed status
+
+#### Simple Schedule (for ESP32)
+`GET /schedule/simple?password=...&queue=GPV3.1&days=2`
+- Returns compact JSON format optimized for microcontrollers
+- Minimal payload size for low-memory devices
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `password` | string | Required | API password (set via `API_PASSWORD` env var) |
+| `queue` | string | `GPV3.1` | DTEK queue identifier |
+| `days` | integer | `2` | Number of days (1 or 2) |
+
+### Response Formats
+
+#### Simple Format (ESP32)
+```json
+{
+  "q": "GPV3.1",
+  "d": [
+    [1,1,0,0,2,3,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1],
+    [0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1]
+  ]
+}
 ```
 
-Or use the convenience script:
-```bash
-./run.sh
-```
+**Status Codes:**
+- `0` - No power
+- `1` - Power on
+- `2` - First half off
+- `3` - Second half off
 
-### Web Server (API for ESP32)
+### Environment Variables
 
-**Development server:**
-```bash
-./run_server.sh
-```
+- `API_PASSWORD` - Set the API password (default: `dtek2024`)
+- `PORT` - Server port (default: `5000`)
 
-**Production server (recommended):**
-```bash
-./run_prod.sh
-```
+## Terminal Output Format
 
-The server will start on `http://0.0.0.0:5000` with the following endpoints:
-
-**Endpoints:**
-- `GET /schedule?password=dtek2024&queue=GPV3.1&days=2` - Full schedule data
-- `GET /schedule/simple?password=dtek2024&queue=GPV3.1&days=2` - Compact format for ESP32
-
-**Parameters:**
-- `password` - API password (default: `dtek2024`, change via `API_PASSWORD` env var)
-- `queue` - Queue name (default: `GPV3.1`)
-- `days` - Number of days to return: 1 or 2 (default: 2)
-
-**Change Password:**
-```bash
-export API_PASSWORD="your_secure_password"
-./run_server.sh
-```
-
-**Install as system service (autostart on boot):**
-```bash
-./autostart.sh
-```
-
-See `ESP32_EXAMPLE.md` for Arduino/ESP32 code examples.
-
-The script will:
-- Load the DTEK shutdowns page using Selenium
-- Wait for Incapsula protection to complete
-- Extract schedule data from JavaScript variables
-- Display the schedule for GPV3.1 queue in the same format as the original bash script
-
-## Output Format
-
-The script outputs:
+When running `main.py` or `./run.sh`:
 - Header row: hours 00-23
-- Status row: + (power on), - (power off), -+ (first half off), +- (second half off), ? (unknown)
+- Status row: `+` (power on), `-` (power off), `-+` (first half off), `+-` (second half off), `?` (unknown)
+
+## Production Deployment
+
+For detailed production deployment with systemd service and Nginx, see [PRODUCTION.md](PRODUCTION.md).
 
 ## Troubleshooting
 
-If the script fails:
-1. Check that ChromeDriver is installed and in PATH
-2. The script saves `debug.html` if parsing fails - inspect it to see what was loaded
-3. Increase wait times if Incapsula challenge takes longer
-4. Try running without `--headless` mode to see what's happening
+### Scraping Issues
+1. The script saves `debug.html` if parsing fails - inspect it to see what was loaded
+2. Increase wait times if Incapsula challenge takes longer
+3. Try running without `--headless` mode in `main.py` to see browser behavior
+
+### Chrome/Chromium Issues
+- Ubuntu: If `chromium-browser` package not found, try `chromium`
+- The script uses undetected-chromedriver which auto-downloads matching ChromeDriver
+
+### Service Issues
+- Check logs: `sudo journalctl -u dtek-schedule -f`
+- Verify paths in `dtek-schedule.service` are absolute
+- Ensure virtual environment is activated in service file
 

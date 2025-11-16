@@ -1,8 +1,48 @@
-Server + Heltec Wireless Paper(ESP32) client for displaying dtek graphics
+# DTEK Schedule Display
 
-## Deploy on Ubuntu (via git clone)
+Server + Heltec Wireless Paper (ESP32) client for displaying DTEK electricity shutdown schedules on e-ink display.
 
-This project includes a Python API server in `server/` that scrapes and serves DTEK schedules for an ESP32 client. Below are quick steps to deploy it on an Ubuntu server using git clone. For advanced/production details, see `server/PRODUCTION.md` and `server/README.md`.
+## Overview
+
+This project consists of two components:
+- **Server**: Python API that scrapes DTEK schedules and serves them in a simple JSON format
+- **Client**: ESP32-based e-ink display that fetches and displays the schedule
+
+## ESP32 Client
+
+The client runs on Heltec Wireless Paper boards and displays the electricity schedule on an e-ink screen. It shows today's and tomorrow's schedules with visual indicators for power status.
+
+### Features
+- Deep sleep mode for battery efficiency (wakes up every hour)
+- Visual schedule display with hour blocks
+- Battery voltage monitoring
+- NTP time synchronization
+- Support for different power statuses (on/off/partial)
+
+### Hardware Requirements
+- Heltec Wireless Paper V1.2 (or compatible versions)
+- WiFi network access
+
+### Configuration
+Edit `client/main.ino` and update:
+```cpp
+#define WIFI_SSID "your-wifi-ssid"
+#define PASSWORD "your-wifi-password"
+#define API_URL "https://your-server.com/schedule/simple?password=your-password&queue=GPV3.1&days=2"
+```
+
+### Installation
+1. Install Arduino IDE with ESP32 board support
+2. Install required libraries:
+   - [heltec-eink-modules](https://github.com/todd-herbert/heltec-eink-modules)
+   - ArduinoJson
+   - HTTPClient (included with ESP32)
+3. Select your board version in the code (line 9)
+4. Upload to your Heltec Wireless Paper board
+
+## Server Deployment
+
+The Python API server scrapes and serves DTEK schedules. Below are quick steps to deploy it on Ubuntu.
 
 ### 1) Install system dependencies
 
@@ -66,20 +106,22 @@ sudo systemctl restart dtek-schedule
 
 For internet exposure, put Nginx in front and proxy to `127.0.0.1:5000`. See `server/PRODUCTION.md` for a ready-to-use Nginx example and HTTPS with Let’s Encrypt.
 
-### 7) Firewall quick-start (optional)
+### 7) API Endpoints
 
-```bash
-# If exposing directly
-sudo ufw allow 5000/tcp
+- `GET /health` — service health check
+- `GET /schedule/simple?password=...&queue=GPV3.1&days=2` — returns simplified JSON for ESP32 client
+- `GET /schedule?password=...&queue=GPV3.1&days=2` — returns full schedule data
 
-# If using Nginx
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
+Response format for `/schedule/simple`:
+```json
+{
+  "q": "GPV3.1",
+  "d": [
+    [1,1,0,0,2,3,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1],  // Today (24 hours)
+    [0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1]   // Tomorrow
+  ]
+}
 ```
+Status codes: 0=no power, 1=power on, 2=first half off, 3=second half off
 
-### API endpoints (defaults)
-- `GET /health` — service health
-- `GET /schedule?password=...&queue=GPV3.1&days=2`
-- `GET /schedule/simple?password=...&queue=GPV3.1&days=2`
-
-See `server/README.md` for complete usage and parameters.
+For more details, see `server/README.md` and `server/PRODUCTION.md`.
