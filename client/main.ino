@@ -82,27 +82,46 @@ void setup() {
     display.clear();
     display.fastmodeOn();
 
-    // Connect to WiFi
+    // Connect to WiFi with retry logic
     WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, PASSWORD);
-    uint32_t wifi_connect_start = millis();
-    logToDisplay("[WiFi] Connecting...");
+    int wifi_attempts = 0;
+    const int MAX_WIFI_ATTEMPTS = 3;
+    bool wifi_connected = false;
     
-    bool logged_stillwaiting = false;
-    while (WiFi.status() != WL_CONNECTED) {
-        uint32_t now = millis();
-        if (!logged_stillwaiting && now > wifi_connect_start + 15000) {
-            logToDisplay("[WiFi] Still waiting...");
-            logged_stillwaiting = true;
+    while (wifi_attempts < MAX_WIFI_ATTEMPTS && !wifi_connected) {
+        wifi_attempts++;
+        
+        if (wifi_attempts > 1) {
+            logToDisplay("[WiFi] Retrying...");
+            WiFi.disconnect();
+            delay(1000);
         }
-        if (millis() > wifi_connect_start + 30000) {
-            logToDisplay("[WiFi] Timeout.", false);
-            break;  // Exit loop but continue to deep sleep
+        
+        WiFi.begin(WIFI_SSID, PASSWORD);
+        uint32_t wifi_connect_start = millis();
+        
+        char attempt_msg[30];
+        sprintf(attempt_msg, "[WiFi] Connecting (%d/%d)...", wifi_attempts, MAX_WIFI_ATTEMPTS);
+        logToDisplay(attempt_msg);
+        
+        while (WiFi.status() != WL_CONNECTED) {
+            uint32_t now = millis();
+            
+            // After 15 seconds, retry from scratch
+            if (now > wifi_connect_start + 15000) {
+                logToDisplay("[WiFi] Still waiting...");
+                break;  // Break to retry from scratch
+            }
+            
+            yield();
         }
-        yield();
+        
+        if (WiFi.status() == WL_CONNECTED) {
+            wifi_connected = true;
+        }
     }
     
-    if (WiFi.status() == WL_CONNECTED) {
+    if (wifi_connected) {
         logToDisplay("[WiFi] Connected!");
         
         // Sync time with NTP server
@@ -110,6 +129,8 @@ void setup() {
         
         // Fetch and display schedule
         fetchAndDisplaySchedule();
+    } else {
+        logToDisplay("[WiFi] Failed after 3 attempts.", false);
     }
     
     // Disconnect WiFi to save power before deep sleep
