@@ -1,8 +1,10 @@
 # DTEK Schedule Display
 
-Server + Heltec Wireless Paper (ESP32) client for displaying DTEK electricity shutdown schedules on e-ink display.
+Server + Heltec Wireless Paper (ESP32) client for displaying [DTEK](https://www.dtek-dnem.com.ua/ua/shutdowns) electricity shutdown schedules on e-ink display.
 
 ## Overview
+
+This is 95% AI-generated, so be careful. Basic functionality works and tested, but expect bugs
 
 This project consists of two components:
 - **Server**: Python API that scrapes DTEK schedules and serves them in a simple JSON format
