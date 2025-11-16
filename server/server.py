@@ -8,6 +8,7 @@ import json
 import time
 import datetime
 import os
+import shutil
 from flask import Flask, jsonify, request
 from functools import wraps
 
@@ -49,6 +50,28 @@ def require_password(f):
     return decorated_function
 
 
+def find_chromedriver():
+    """Find ChromeDriver executable in common locations or PATH."""
+    # Check PATH first (most universal)
+    chromedriver_path = shutil.which('chromedriver')
+    if chromedriver_path:
+        return chromedriver_path
+    
+    # Common system locations
+    common_paths = [
+        '/usr/bin/chromedriver',
+        '/usr/local/bin/chromedriver',
+        '/snap/bin/chromium.chromedriver',
+    ]
+    
+    for path in common_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+    
+    # Return None to let undetected-chromedriver auto-download (may fail on ARM)
+    return None
+
+
 def setup_driver():
     """Setup Chrome driver with options to avoid detection."""
     if USE_UNDETECTED:
@@ -56,7 +79,14 @@ def setup_driver():
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        driver = uc.Chrome(options=options, version_main=None)
+        
+        # Find system ChromeDriver (works on both ARM and x86_64)
+        chromedriver_path = find_chromedriver()
+        if chromedriver_path:
+            driver = uc.Chrome(options=options, driver_executable_path=chromedriver_path, version_main=None)
+        else:
+            # Fallback: let it auto-download (may fail on ARM)
+            driver = uc.Chrome(options=options, version_main=None)
         return driver
     else:
         chrome_options = Options()
