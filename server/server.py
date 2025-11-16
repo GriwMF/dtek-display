@@ -56,13 +56,7 @@ def setup_driver():
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        # Use snap's ARM-compatible chromedriver and chromium
-        driver = uc.Chrome(
-            options=options,
-            driver_executable_path='/snap/bin/chromium.chromedriver',
-            browser_executable_path='/snap/bin/chromium',
-            version_main=None
-        )
+        driver = uc.Chrome(options=options, version_main=None)
         return driver
     else:
         chrome_options = Options()
