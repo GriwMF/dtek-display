@@ -8,7 +8,9 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/dtek-display/server
 Environment="PATH=/home/ubuntu/dtek-display/server/venv/bin"
 Environment="API_PASSWORD=dtek2025"
-ExecStart=/home/ubuntu/dtek-display/server/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 --timeout 120 server:app
+ExecStart=/home/ubuntu/dtek-display/server/venv/bin/gunicorn -w 1 -b 0.0.0.0:5000 --timeout 120 --access-logfile - --error-logfile - server:app
+StandardOutput=journal
+StandardError=journal
 Restart=always
 RestartSec=10
 
