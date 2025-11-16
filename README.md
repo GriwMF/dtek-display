@@ -31,11 +31,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Optional but recommended:
-```bash
-export API_PASSWORD="$(openssl rand -base64 24)"  # set a strong API password
-```
-
 ### 4) Test run (foreground)
 
 ```bash

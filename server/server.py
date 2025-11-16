@@ -8,6 +8,7 @@ import json
 import time
 import datetime
 import os
+import shutil
 from flask import Flask, jsonify, request
 from functools import wraps
 
@@ -25,7 +26,7 @@ except ImportError:
 app = Flask(__name__)
 
 # Simple password - can be set via environment variable or changed here
-API_PASSWORD = os.environ.get('API_PASSWORD', 'dtek2024')
+API_PASSWORD = os.environ.get('API_PASSWORD', 'dtek2025')
 
 # Cache for schedule data (to avoid hammering the DTEK website)
 cache = {
@@ -49,13 +50,39 @@ def require_password(f):
     return decorated_function
 
 
+def find_chromium_binary():
+    """Find Chromium binary in common locations."""
+    # Common locations to check (in order of preference)
+    possible_paths = [
+        '/usr/bin/chromium-browser',  # Ubuntu/Debian apt package
+        '/usr/bin/chromium',          # Some distributions
+        '/usr/bin/google-chrome',     # Google Chrome
+        '/snap/bin/chromium',         # Snap package (may have permission issues)
+    ]
+    
+    # Also check PATH
+    chromium_in_path = shutil.which('chromium-browser') or shutil.which('chromium')
+    if chromium_in_path:
+        possible_paths.insert(0, chromium_in_path)
+    
+    for path in possible_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+    
+    return None
+
+
 def setup_driver():
     """Setup Chrome driver with options to avoid detection."""
+    chromium_binary = find_chromium_binary()
+    
     if USE_UNDETECTED:
         options = uc.ChromeOptions()
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        if chromium_binary:
+            options.binary_location = chromium_binary
         driver = uc.Chrome(options=options, version_main=None)
         return driver
     else:
@@ -67,6 +94,8 @@ def setup_driver():
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+        if chromium_binary:
+            chrome_options.binary_location = chromium_binary
         
         driver = webdriver.Chrome(options=chrome_options)
         driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
