@@ -72,6 +72,27 @@ def find_chromedriver():
     return None
 
 
+def find_chromium_binary():
+    """Find Chromium binary in common locations or PATH."""
+    # Check PATH first
+    chromium_path = shutil.which('chromium-browser') or shutil.which('chromium')
+    if chromium_path:
+        return chromium_path
+    
+    # Common system locations
+    common_paths = [
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/snap/bin/chromium',
+    ]
+    
+    for path in common_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+    
+    return None
+
+
 def setup_driver():
     """Setup Chrome driver with options to avoid detection."""
     if USE_UNDETECTED:
@@ -80,8 +101,15 @@ def setup_driver():
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         
-        # Find system ChromeDriver (works on both ARM and x86_64)
+        # Find Chromium binary and ChromeDriver
+        chromium_binary = find_chromium_binary()
         chromedriver_path = find_chromedriver()
+        
+        # Set Chromium binary location if found
+        if chromium_binary:
+            options.binary_location = chromium_binary
+        
+        # Use system ChromeDriver if found
         if chromedriver_path:
             driver = uc.Chrome(options=options, driver_executable_path=chromedriver_path, version_main=None)
         else:
