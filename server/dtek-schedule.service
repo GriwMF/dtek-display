@@ -4,11 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=griwsl
-WorkingDirectory=/home/griwsl/py-graphic
-Environment="PATH=/home/griwsl/py-graphic/venv/bin"
-Environment="API_PASSWORD=dtek2024"
-ExecStart=/home/griwsl/py-graphic/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 --timeout 120 server:app
+User=ubuntu
+WorkingDirectory=/home/ubuntu/py-graphic
+Environment="PATH=/home/ubuntu/py-graphic/venv/bin"
+Environment="API_PASSWORD=dtek2025"
+ExecStart=/home/ubuntu/py-graphic/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 --timeout 120 server:app
 Restart=always
 RestartSec=10
 
