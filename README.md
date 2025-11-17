@@ -44,7 +44,20 @@ Edit `client/main.ino` and update:
 
 ## Server Deployment
 
-The Python API server scrapes and serves DTEK schedules. Below are quick steps to deploy it on Ubuntu.
+The Python API server scrapes and serves DTEK schedules.
+
+### Docker Deployment
+
+```bash
+cd server
+docker-compose up -d
+```
+
+See server/Dockerfile and server/docker-compose.yml
+
+### Native Linux Deployment
+
+Below are quick steps to deploy it on Ubuntu.
 
 ### 1) Install system dependencies
 

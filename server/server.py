@@ -26,7 +26,7 @@ except ImportError:
 app = Flask(__name__)
 
 # Simple password - can be set via environment variable or changed here
-API_PASSWORD = os.environ.get('API_PASSWORD', 'dtek2025')
+API_PASSWORD = os.environ.get('API_PASSWORD', 'API_PASSWORD')
 
 # Cache for schedule data (to avoid hammering the DTEK website)
 cache = {

@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  dtek-display:
+    image: sverhkot/dtek-display:latest
+    container_name: dtek-display
+    restart: unless-stopped
+    environment:
+      - API_PASSWORD=API_PASSWORD
+networks:
+  default:
+    external: true
+    name: nginx-network

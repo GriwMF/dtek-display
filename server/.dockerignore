@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/
+
+# Documentation (not needed in container)
+*.md
+ESP32_EXAMPLE.md
+PRODUCTION.md
+README.md
+
+# Scripts (not needed in container)
+autostart.sh
+run.sh
+run_server.sh
+run_prod.sh
+dtek-schedule.service
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+.DS_Store
+
