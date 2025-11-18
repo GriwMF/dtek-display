@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/home/ubuntu/dtek-display/server
 Environment="PATH=/home/ubuntu/dtek-display/server/venv/bin"
-Environment="API_PASSWORD=dtek2025"
+Environment="API_PASSWORD=API_PASSWORD"
 ExecStart=/home/ubuntu/dtek-display/server/venv/bin/gunicorn -w 1 -b 0.0.0.0:5000 --timeout 120 --access-logfile - --error-logfile - server:app
 StandardOutput=journal
 StandardError=journal

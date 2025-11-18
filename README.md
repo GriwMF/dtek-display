@@ -2,6 +2,8 @@
 
 Server + Heltec Wireless Paper (ESP32) client for displaying [DTEK](https://www.dtek-dnem.com.ua/ua/shutdowns) electricity shutdown schedules on e-ink display.
 
+![Client Photo](client/photo.jpg)
+
 ## Overview
 
 This is 95% AI-generated, so be careful. Basic functionality works and tested, but expect bugs
@@ -19,7 +21,6 @@ The client runs on Heltec Wireless Paper boards and displays the electricity sch
 - Visual schedule display with hour blocks
 - Battery voltage monitoring
 - NTP time synchronization
-- Support for different power statuses (on/off/partial)
 
 ### Hardware Requirements
 - Heltec Wireless Paper V1.2 (or compatible versions)

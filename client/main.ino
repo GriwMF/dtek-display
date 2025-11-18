@@ -57,6 +57,8 @@ void displaySchedule(const char* queue, JsonArray days);
 void drawHourBlock(int x, int y, int width, int height, int status, int hour);
 void syncTime();
 String getFormattedTime();
+int getCurrentHour();
+uint64_t calculateSleepUntilNextHour();
 float readBatteryVoltage();
 String getFormattedBatteryVoltage();
 String getCachedBatteryVoltage();
@@ -140,10 +142,13 @@ void setup() {
     // Configure hardware for low-power (required for 18uA deep sleep current)
     Platform::prepareToSleep();
     
-    // Configure deep sleep for 1 hour
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_DURATION);
+    // Calculate dynamic sleep duration until next hour boundary (00:00:30)
+    uint64_t sleep_duration = calculateSleepUntilNextHour();
     
-    // Enter deep sleep - device will restart after 1 hour and run setup() again
+    // Configure deep sleep to wake up at next hour boundary
+    esp_sleep_enable_timer_wakeup(sleep_duration);
+    
+    // Enter deep sleep - device will restart at next hour boundary and run setup() again
     // The library will automatically reverse the sleep state when the display is next used
     esp_deep_sleep_start();
 }
@@ -172,37 +177,65 @@ void fetchAndDisplaySchedule() {
     client.setInsecure();  // Skip certificate validation for simplicity
     client.setTimeout(10000);  // 10 second timeout
     
-    HTTPClient http;
-    http.setTimeout(20000);  // 20 second timeout
-    http.begin(client, API_URL);
+    // HTTP retry logic
+    int http_attempts = 0;
+    const int MAX_HTTP_ATTEMPTS = 3;
+    bool http_success = false;
+    String payload = "";
     
-    // Add headers
-    http.addHeader("User-Agent", "ESP32-DTEK-Display/1.0");
-    http.addHeader("Connection", "close");
-    
-    int http_code = http.GET();
-    
-    char message[60];
-    strcpy(message, "[API] HTTP: ");
-    char http_code_str[6];
-    itoa(http_code, http_code_str, 10);
-    strcat(message, http_code_str);
-    logToDisplay(message);
-    
-    if (http_code != HTTP_CODE_OK) {
-        // Log more detailed error info
-        if (http_code < 0) {
-            strcpy(message, "[API] Error code: ");
-            strcat(message, http_code_str);
-            logToDisplay(message);
+    while (http_attempts < MAX_HTTP_ATTEMPTS && !http_success) {
+        http_attempts++;
+        
+        if (http_attempts > 1) {
+            logToDisplay("[API] Retrying...");
+            delay(1000);
         }
-        logToDisplay("[API] Failed. Aborting.", false);
-        http.end();
-        return;
+        
+        HTTPClient http;
+        http.setTimeout(20000);  // 20 second timeout
+        http.begin(client, API_URL);
+        
+        // Add headers
+        http.addHeader("User-Agent", "ESP32-DTEK-Display/1.0");
+        http.addHeader("Connection", "close");
+        
+        char attempt_msg[30];
+        sprintf(attempt_msg, "[API] Attempt (%d/%d)...", http_attempts, MAX_HTTP_ATTEMPTS);
+        logToDisplay(attempt_msg);
+        
+        int http_code = http.GET();
+        
+        char message[60];
+        strcpy(message, "[API] HTTP: ");
+        char http_code_str[6];
+        itoa(http_code, http_code_str, 10);
+        strcat(message, http_code_str);
+        logToDisplay(message);
+        
+        if (http_code == HTTP_CODE_OK) {
+            payload = http.getString();
+            http.end();
+            http_success = true;
+        } else {
+            // Log more detailed error info
+            if (http_code < 0) {
+                strcpy(message, "[API] Error code: ");
+                strcat(message, http_code_str);
+                logToDisplay(message);
+            }
+            http.end();
+            
+            if (http_attempts >= MAX_HTTP_ATTEMPTS) {
+                logToDisplay("[API] Failed after 3 attempts.", false);
+                return;
+            }
+        }
     }
     
-    String payload = http.getString();
-    http.end();
+    if (!http_success) {
+        logToDisplay("[API] Failed. Aborting.", false);
+        return;
+    }
     
     logToDisplay("[API] Parsing JSON...");
     
@@ -268,7 +301,10 @@ void displaySchedule(const char* queue, JsonArray days) {
     int hour_label_height = 10;  // Space for hour labels below bars (reduced)
     int day_height = (screen_height - header_height) / days.size();
     int hour_width = screen_width / 24;
-    int bar_height = day_height - 25;  // Smaller bars, leaving room for labels
+    int bar_height = day_height - 28;  // Smaller bars (reduced by 3px), leaving room for labels
+    
+    // Get current hour for highlighting
+    int current_hour = getCurrentHour();
     
     // Display each day
     for (int day_idx = 0; day_idx < days.size() && day_idx < 2; day_idx++) {
@@ -285,13 +321,24 @@ void displaySchedule(const char* queue, JsonArray days) {
         for (int hour = 0; hour < 24 && hour < hours.size(); hour++) {
             int status = hours[hour];
             int block_x = hour * hour_width;
-            drawHourBlock(block_x, block_y, hour_width - 1, bar_height, status, hour);
+            
+            // Make current hour bar taller (+2px) and adjust y position to keep alignment
+            int this_bar_height = bar_height;
+            int this_block_y = block_y;
+            bool is_current_hour = (day_idx == 0 && hour == current_hour);
+            
+            if (is_current_hour) {
+                this_bar_height = bar_height + 2;  // Make current hour bar 2px taller
+                this_block_y = block_y - 2;  // Move up 2px to keep bottom aligned with other bars
+            }
+            
+            drawHourBlock(block_x, this_block_y, hour_width - 1, this_bar_height, status, hour);
             
             // Display pivot hours (every 3 hours: 0, 3, 6, 9, 12, 15, 18, 21) below the bars
             if (hour % 3 == 0) {
                 // Draw vertical line from bottom of bar to hour label (left side of bar)
-                int line_start_y = block_y + bar_height;
-                int line_end_y = block_y + bar_height + 3;
+                int line_start_y = this_block_y + this_bar_height;
+                int line_end_y = this_block_y + this_bar_height + 3;
                 int line_x = block_x + 1;  // Left side of the bar
                 
                 for (int py = line_start_y; py <= line_end_y; py++) {
@@ -299,7 +346,7 @@ void displaySchedule(const char* queue, JsonArray days) {
                 }
                 
                 // Display hour number below the line (moved up)
-                display.setCursor(block_x + 1, block_y + bar_height + 4);
+                display.setCursor(block_x + 1, this_block_y + this_bar_height + 4);
                 display.print(hour);
             }
         }
@@ -335,7 +382,7 @@ void drawHourBlock(int x, int y, int width, int height, int status, int hour) {
             }
             break;
         case 2:  // First half off - fill left half with black, draw / line (top-left to bottom-right)
-            // Fill with white and border, then fill first half with black
+            // Fill with white and border, then fill left half with black
             for (int py = y; py < y + height; py++) {
                 for (int px = x; px < x + width; px++) {
                     if (px == x || px == x + width - 1 || py == y || py == y + height - 1) {
@@ -344,7 +391,8 @@ void drawHourBlock(int x, int y, int width, int height, int status, int hour) {
                         // Calculate diagonal line y position for this x
                         int diag_y = y + ((px - x) * height / width);
                         // Fill left half (below the / line) with black
-                        if (py < diag_y) {
+                        // For "/" line, pixels below the line (py > diag_y) are in the left/bottom area
+                        if (py > diag_y) {
                             display.drawPixel(px, py, BLACK);
                         } else {
                             display.drawPixel(px, py, WHITE);  // Background
@@ -360,8 +408,8 @@ void drawHourBlock(int x, int y, int width, int height, int status, int hour) {
                 }
             }
             break;
-        case 3:  // Second half off - fill right half with black, draw \ line (bottom-left to top-right)
-            // Fill with white and border, then fill second half with black
+        case 3:  // Second half off - fill bottom-left with black, draw \ line (bottom-left to top-right)
+            // Fill with white and border, then fill bottom-left part with black
             for (int py = y; py < y + height; py++) {
                 for (int px = x; px < x + width; px++) {
                     if (px == x || px == x + width - 1 || py == y || py == y + height - 1) {
@@ -369,11 +417,12 @@ void drawHourBlock(int x, int y, int width, int height, int status, int hour) {
                     } else {
                         // Calculate diagonal line y position for this x
                         int diag_y = y + height - 1 - ((px - x) * height / width);
-                        // Fill right half (below the \ line) with black
-                        if (py > diag_y) {
+                        // Fill bottom-left part (below/on the \ line) with black
+                        // For "\" line, pixels at or below the line (py >= diag_y) are in the bottom-left area
+                        if (py >= diag_y) {
                             display.drawPixel(px, py, BLACK);
                         } else {
-                            display.drawPixel(px, py, WHITE);  // Background
+                            display.drawPixel(px, py, WHITE);  // Top-right part is white
                         }
                     }
                 }
@@ -454,6 +503,38 @@ String getFormattedTime() {
     char timeStr[6];
     strftime(timeStr, sizeof(timeStr), "%H:%M", &timeinfo);
     return String(timeStr);
+}
+
+// Get current hour (0-23)
+int getCurrentHour() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        return -1;  // Return -1 if time not available
+    }
+    return timeinfo.tm_hour;
+}
+
+// Calculate sleep duration until next hour boundary (00:00:30)
+// Returns duration in microseconds
+uint64_t calculateSleepUntilNextHour() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        // If time not available, fall back to 1 hour
+        return DEEP_SLEEP_DURATION;
+    }
+    
+    // Calculate seconds until next hour
+    int current_minute = timeinfo.tm_min;
+    int current_second = timeinfo.tm_sec;
+    
+    // Seconds remaining in current hour
+    int seconds_until_hour = (60 - current_minute) * 60 - current_second;
+    
+    // Add 30 seconds to wake up at :00:30 to account for timing accuracy
+    int sleep_seconds = seconds_until_hour + 30;
+    
+    // Convert to microseconds
+    return (uint64_t)sleep_seconds * 1000000ULL;
 }
 
 // Read battery voltage from ADC
